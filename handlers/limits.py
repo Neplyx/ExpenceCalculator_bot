@@ -13,48 +13,33 @@ router = Router()
 async def render_limits_menu(event: types.Message | types.CallbackQuery):
     user_id = event.from_user.id
     limits = db.get_limits(user_id)
-    
-    # Початок поточного місяця для фільтрації витрат
     month_start = datetime.now().strftime("%Y-%m-01")
     
     builder = InlineKeyboardBuilder()
     builder.button(text="Додати/Змінити ліміт ➕", callback_data="limit_add")
     
+    text = "📊 <b>МОНІТОРИНГ ЛІМІТІВ</b>\n"
+    text += "<code>" + "—" * 20 + "</code>\n\n"
+    
     if not limits:
-        text = (
-            "📉 <b>ЛІМІТИ НЕ ВСТАНОВЛЕНІ</b>\n"
-            "<code>" + "—" * 20 + "</code>\n\n"
-            "Контроль витрат — це перший крок до фінансової свободи! "
-            "Встановіть ліміти на категорії, щоб не витрачати зайвого."
-        )
+        text += "Ліміти не встановлені. Почніть контролювати витрати вже сьогодні! 📉"
     else:
-        text = "📊 <b>МОНІТОРИНГ ЛІМІТІВ:</b>\n"
-        text += "<code>" + "—" * 20 + "</code>\n\n"
-        
         for category, limit_amount in limits:
-            current_spent = db.get_month_sum_by_category(user_id, category, month_start)
-            progress = get_progress_bar(current_spent, limit_amount)
-            
-            # Визначаємо статус ліміту
-            status = "✅" if current_spent < limit_amount else "🛑"
-            
-            text += (
-                f"{status} <b>{category}</b>\n"
-                f"{progress}\n"
-                f"💰 <code>{current_spent:.2f} / {limit_amount:.2f} грн</code>\n\n"
-            )
+            spent = db.get_month_sum_by_category(user_id, category, month_start)
+            progress = get_progress_bar(spent, limit_amount)
+            status = "✅" if spent < limit_amount else "🛑"
+            text += f"{status} <b>{category}</b>\n{progress}\n💰 <code>{spent:.2f} / {limit_amount:.2f} грн</code>\n\n"
         
         text += "<code>" + "—" * 20 + "</code>"
         builder.button(text="Видалити ліміт 🗑", callback_data="limit_delete_menu")
     
     builder.adjust(1)
-    
     if isinstance(event, types.Message):
         await event.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     else:
         await event.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
-@router.message(F.text == "Ліміти 📉", StateFilter("*"))
+@router.message(F.text == "Ліміти 📉", StateFilter(None))
 async def show_limits_message(message: types.Message):
     await render_limits_menu(message)
 

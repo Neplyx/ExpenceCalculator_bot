@@ -34,10 +34,13 @@ def show_expenses(user_id):
         return res[0] or 0
 
 def history_expense(user_id):
+    """Повертає список останніх 5 витрат для подальшого форматування"""
     with sqlite3.connect("expenses.db") as conn:
-        res = conn.execute("SELECT amount, category, date FROM expenses WHERE user_id = ? ORDER BY id DESC LIMIT 5", (user_id,)).fetchall()
-        if not res: return "Історія порожня 🤷‍♂️"
-        return "\n".join([f"📅 {d}: {c} — {a} грн" for a, c, d in res])
+        # Повертаємо чисті дані, а не текст
+        return conn.execute(
+            "SELECT amount, category, date FROM expenses WHERE user_id = ? ORDER BY id DESC LIMIT 5", 
+            (user_id,)
+        ).fetchall()
 
 def daily_expense(user_id, target_date):
     with sqlite3.connect("expenses.db") as conn:

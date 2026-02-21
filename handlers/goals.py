@@ -11,31 +11,27 @@ from utils.formatter import get_progress_bar
 
 router = Router()
 
-@router.message(F.text == "Цілі 🎯", StateFilter("*"))
+@router.message(F.text == "Цілі 🎯", StateFilter(None))
 async def show_goals_menu(message: types.Message):
     goals = db.get_goals(message.from_user.id)
     builder = InlineKeyboardBuilder()
     
     if not goals:
         text = (
-            "✨ <b>Тут поки що порожньо...</b>\n\n"
-            "🎯 Час поставити нову фінансову мету та почати шлях до своєї мрії! "
-            "Я допоможу тобі розрахувати план накопичень."
+            "🎯 <b>ФІНАНСОВІ ЦІЛІ</b>\n"
+            "<code>" + "—" * 20 + "</code>\n\n"
+            "У вас ще немає активних цілей. Час поставити нову фінансову мету та почати шлях до мрії! 🚀"
         )
         builder.button(text="Створити першу ціль 🚀", callback_data="goal_add")
     else:
-        text = "🏆 <b>ТВОЇ ФІНАНСОВІ ВЕРШИНИ:</b>\n"
+        text = "🏆 <b>ТВОЇ ФІНАНСОВІ ВЕРШИНИ</b>\n"
         text += "<code>" + "—" * 20 + "</code>\n\n"
         
         for name, target, current, deadline in goals:
             progress = get_progress_bar(current, target)
             left = max(target - current, 0)
             
-            goal_info = (
-                f"📌 <b>{name}</b>\n"
-                f"{progress}\n"
-                f"💰 <code>{current:.2f} / {target:.2f} грн</code>\n"
-            )
+            goal_info = f"📌 <b>{name.upper()}</b>\n{progress}\n💰 <code>{current:.2f} / {target:.2f} грн</code>\n"
             
             if deadline and left > 0:
                 try:
@@ -44,10 +40,7 @@ async def show_goals_menu(message: types.Message):
                     if days_left > 0:
                         weeks = max(days_left / 7, 1)
                         per_week = left / weeks
-                        goal_info += (
-                            f"📅 Дедлайн: <code>{deadline}</code> ({days_left} дн.)\n"
-                            f"💡 План: <b>{per_week:.2f} грн/тиж</b>\n"
-                        )
+                        goal_info += f"📅 Дедлайн: <code>{deadline}</code>\n💡 План: <b><code>{per_week:.2f} грн/тиж</code></b>\n"
                     else:
                         goal_info += "⚠️ <b>Термін виконання вийшов!</b>\n"
                 except:
@@ -68,58 +61,41 @@ async def show_goals_menu(message: types.Message):
 
 # --- ПОПОВНЕННЯ ЦІЛІ ---
 
-@router.callback_query(F.data.startswith("goal_topup_"), StateFilter("*"))
+@router.callback_query(F.data.startswith("goal_topup_"), StateFilter(None))
 async def goal_topup_start(callback: types.CallbackQuery, state: FSMContext):
     goal_name = callback.data.split("_")[2]
     await state.update_data(active_goal=goal_name)
-    
-    text = (
-        f"💰 <b>Поповнення цілі:</b> '{goal_name}'\n\n"
-        "Введіть суму, яку ви сьогодні відклали у скарбничку:"
-    )
-    await callback.message.answer(text, parse_mode="HTML")
+    await callback.message.answer(f"💰 <b>ПОПОВНЕННЯ:</b> '{goal_name.upper()}'\n\nВведіть суму, яку ви сьогодні відклали:", parse_mode="HTML")
     await state.set_state(GoalStates.adding_savings)
     await callback.answer()
 
 @router.message(GoalStates.adding_savings)
 async def goal_topup_finish(message: types.Message, state: FSMContext):
     if not message.text.replace('.', '', 1).isdigit():
-        await message.answer("❌ <b>Помилка:</b> Будь ласка, введіть число (наприклад: 500 або 150.50)")
+        await message.answer("❌ <b>ПОМИЛКА:</b> Введіть число.")
         return
     
     amount = float(message.text)
     data = await state.get_data()
     goal_name = data['active_goal']
-    
     db.update_goal_savings(message.from_user.id, goal_name, amount)
     
-    # Перевірка на досягнення цілі
+    # Логіка святкування досягнення
     updated_goals = db.get_goals(message.from_user.id)
-    target_met = False
     for name, target, current, _ in updated_goals:
         if name == goal_name and current >= target:
-            target_met = True
-            break
+            celebration = (
+                f"🎊 <b>ВІТАЮ, {message.from_user.first_name.upper()}!</b> 🎊\n"
+                "<code>" + "—" * 20 + "</code>\n\n"
+                f"🥳 Ти щойно досягнув цілі: <b>'{goal_name}'</b>!\n"
+                "<i>Твоя дисципліна дала результат. Насолоджуйся перемогою!</i> 🎆"
+            )
+            await message.answer(celebration, parse_mode="HTML", reply_markup=main_menu())
+            await state.clear()
+            return
 
-    if target_met:
-        user_name = message.from_user.first_name
-        celebration = (
-            f"🎊🎊🎊 <b>ВІТАЮ, {user_name.upper()}!</b> 🎊🎊🎊\n\n"
-            f"🥳 Ти щойно досягнув своєї цілі: <b>'{goal_name}'</b>!\n"
-            "✨ Твоя наполегливість та фінансова дисципліна дали результат.\n\n"
-            "🎆🎆🎆 <i>Час насолодитися перемогою!</i> 🎆🎆🎆"
-        )
-        await message.answer(celebration, parse_mode="HTML", reply_markup=main_menu())
-    else:
-        text = (
-            f"✅ <b>Успішно додано!</b>\n\n"
-            f"Ви внесли <code>{amount:.2f} грн</code> до цілі <b>'{goal_name}'</b>.\n"
-            "Крок за кроком до мрії! 🚀"
-        )
-        await message.answer(text, parse_mode="HTML", reply_markup=main_menu())
-    
+    await message.answer(f"✅ <b>Додано <code>{amount:.2f} грн</code>!</b>\nКрок за кроком до мрії! 🚀", reply_markup=main_menu(), parse_mode="HTML")
     await state.clear()
-
 # --- СТВОРЕННЯ НОВОЇ ЦІЛІ ---
 
 @router.callback_query(F.data == "goal_add", StateFilter("*"))
