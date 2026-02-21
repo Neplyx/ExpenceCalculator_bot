@@ -9,3 +9,8 @@ class GoalStates(StatesGroup):
     entering_target = State()
     entering_deadline = State() # Новий стан для дати
     adding_savings = State()
+
+class SubscriptionStates(StatesGroup):
+    entering_name = State()
+    entering_amount = State()
+    entering_date = State()

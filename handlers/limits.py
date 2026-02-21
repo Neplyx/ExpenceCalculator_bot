@@ -6,7 +6,7 @@ from states import LimitStates
 import database as db
 from utils.formatter import get_progress_bar
 from datetime import datetime
-from handlers.keyboard import main_menu # Імпортуємо для повернення в меню
+from handlers.keyboard import main_menu 
 
 router = Router()
 
@@ -22,7 +22,8 @@ async def render_limits_menu(event: types.Message | types.CallbackQuery):
     
     if not limits:
         text = (
-            "📉 <b>Ліміти не встановлені</b>\n\n"
+            "📉 <b>ЛІМІТИ НЕ ВСТАНОВЛЕНІ</b>\n"
+            "<code>" + "—" * 20 + "</code>\n\n"
             "Контроль витрат — це перший крок до фінансової свободи! "
             "Встановіть ліміти на категорії, щоб не витрачати зайвого."
         )
@@ -35,7 +36,7 @@ async def render_limits_menu(event: types.Message | types.CallbackQuery):
             progress = get_progress_bar(current_spent, limit_amount)
             
             # Визначаємо статус ліміту
-            status = "✅" if current_spent < limit_amount else "⚠️"
+            status = "✅" if current_spent < limit_amount else "🛑"
             
             text += (
                 f"{status} <b>{category}</b>\n"
@@ -57,14 +58,21 @@ async def render_limits_menu(event: types.Message | types.CallbackQuery):
 async def show_limits_message(message: types.Message):
     await render_limits_menu(message)
 
-# --- ДОДАВАННЯ ЛІМІТУ (СТИЛІЗОВАНИЙ КРОК 1) ---
+# --- ДОДАВАННЯ ЛІМІТУ (ОНОВЛЕНО: ВСІ 10 КАТЕГОРІЙ) ---
 @router.callback_query(F.data == "limit_add", StateFilter("*"))
 async def start_limit_add(callback: types.CallbackQuery, state: FSMContext):
-    categories = ["Продукти 🛒", "Транспорт 🚕", "Відпочинок ☕", "Дім/Побут 🏠", "Здоров'я 💊", "Техніка 💻"]
+    # Повний список категорій з KEYWORDS_MAP
+    categories = [
+        "Продукти 🛒", "Транспорт 🚕", "Відпочинок ☕", 
+        "Дім/Побут 🏠", "Здоров'я 💊", "Техніка 💻",
+        "Одяг та взуття 👕", "Краса та догляд ✨", 
+        "Донати та подарунки 🎁", "Тварини 🐾"
+    ]
+    
     builder = InlineKeyboardBuilder()
     for cat in categories:
         builder.button(text=cat, callback_data=f"setlcat_{cat}")
-    builder.adjust(2)
+    builder.adjust(2) # Кнопки у два стовпчики для зручності
     
     text = (
         "🛠 <b>Крок 1: Оберіть категорію</b>\n\n"
@@ -73,7 +81,6 @@ async def start_limit_add(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await state.set_state(LimitStates.choosing_category)
 
-# --- ДОДАВАННЯ ЛІМІТУ (СТИЛІЗОВАНИЙ КРОК 2) ---
 @router.callback_query(LimitStates.choosing_category, F.data.startswith("setlcat_"))
 async def process_limit_cat(callback: types.CallbackQuery, state: FSMContext):
     category = callback.data.split("_")[1]
@@ -99,10 +106,11 @@ async def process_limit_amt(message: types.Message, state: FSMContext):
     db.set_limit(message.from_user.id, category, amount)
     
     success_text = (
-        f"✅ <b>Ліміт встановлено!</b>\n\n"
+        f"✅ <b>Ліміт встановлено!</b>\n"
+        "<code>" + "—" * 20 + "</code>\n"
         f"📌 <b>Категорія:</b> {category}\n"
         f"💰 <b>Сума:</b> <code>{amount:.2f} грн/міс</code>\n\n"
-        f"Бот автоматично попередить вас при наближенні до цієї суми."
+        "<i>Бот автоматично попередить вас при наближенні до цієї суми.</i>"
     )
     await message.answer(success_text, reply_markup=main_menu(), parse_mode="HTML")
     await state.clear()
@@ -122,7 +130,10 @@ async def show_delete_limits_list(callback: types.CallbackQuery):
     builder.button(text="Назад 🔙", callback_data="limit_back")
     builder.adjust(1)
     
-    text = "🗑 <b>ВИДАЛЕННЯ ЛІМІТУ:</b>\n\nОберіть категорію, яку хочете прибрати з моніторингу:"
+    text = (
+        "🗑 <b>ВИДАЛЕННЯ ЛІМІТУ</b>\n\n"
+        "Оберіть категорію, яку хочете прибрати з моніторингу:"
+    )
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
@@ -131,7 +142,7 @@ async def execute_limit_deletion(callback: types.CallbackQuery):
     category = callback.data.split("_")[1]
     db.delete_limit(callback.from_user.id, category)
     
-    text = f"✅ <b>Ліміт для '{category}' успішно видалено.</b>"
+    text = f"✅ <b>Успішно:</b> Ліміт для '{category}' видалено."
     await callback.message.edit_text(text, parse_mode="HTML")
     await callback.answer()
 

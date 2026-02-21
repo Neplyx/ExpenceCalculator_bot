@@ -28,21 +28,20 @@ async def send_stats(message: types.Message):
     total_sum = sum(amounts)
 
     # Налаштування професійного вигляду графіка
-    plt.style.use('ggplot') # Сучасний стиль
+    plt.style.use('ggplot') 
     fig, ax = plt.subplots(figsize=(10, 7))
     
     colors = plt.cm.Paired(range(len(categories)))
     wedges, texts, autotexts = ax.pie(
         amounts, 
-        labels=None, # Прибираємо лейбли з самого кола для чистоти
+        labels=None, 
         autopct='%1.1f%%', 
         startangle=140, 
         colors=colors,
         pctdistance=0.85,
-        explode=[0.05] * len(categories) # Легке роз'єднання секторів
+        explode=[0.05] * len(categories) 
     )
 
-    # Малюємо коло в центрі для ефекту "Donut Chart"
     centre_circle = plt.Circle((0,0), 0.70, fc='white')
     fig.gca().add_artist(centre_circle)
 
@@ -53,7 +52,6 @@ async def send_stats(message: types.Message):
     plt.savefig(image_path, bbox_inches='tight', dpi=150)
     plt.close()
 
-    # Формування стилізованого підпису
     caption = (
         "📊 <b>ГЛОБАЛЬНА АНАЛІТИКА</b>\n"
         "<code>" + "—" * 20 + "</code>\n\n"
@@ -62,7 +60,6 @@ async def send_stats(message: types.Message):
         "<b>Топ категорій:</b>\n"
     )
     
-    # Додаємо список категорій у підпис
     for cat, amt in zip(categories, amounts):
         percent = (amt / total_sum) * 100
         caption += f"🔹 {cat}: <code>{amt:.2f} грн</code> (<b>{percent:.1f}%</b>)\n"
@@ -79,19 +76,26 @@ async def send_stats(message: types.Message):
 async def show_rates(message: types.Message):
     rates = get_currency_rates()
     
-    if rates and rates.get("USD") and rates.get("EUR"):
-        usd_buy, usd_sell = rates["USD"]
-        eur_buy, eur_sell = rates["EUR"]
+    if rates:
+        text = "🏦 <b>МОНІТОРИНГ ВАЛЮТ (Monobank)</b>\n"
+        text += "<code>" + "—" * 20 + "</code>\n\n"
         
-        text = (
-            "🏦 <b>МОНІТОРИНГ ВАЛЮТ (Monobank)</b>\n"
-            "<code>" + "—" * 20 + "</code>\n\n"
-            f"🇺🇸 <b>USD:</b> <code>{usd_buy:.2f} / {usd_sell:.2f}</code> грн\n"
-            f"🇪🇺 <b>EUR:</b> <code>{eur_buy:.2f} / {eur_sell:.2f}</code> грн\n\n"
-            "<code>" + "—" * 20 + "</code>\n"
-            "🕒 <i>Дані оновлюються автоматично</i>"
-        )
+        # Словник для зручного виводу з прапорами
+        curr_info = {
+            "USD": ("🇺🇸", "USD"),
+            "EUR": ("🇪🇺", "EUR"),
+            "PLN": ("🇵🇱", "PLN"),
+            "GBP": ("🇬🇧", "GBP")
+        }
+        
+        for code, (flag, name) in curr_info.items():
+            if code in rates:
+                buy, sell = rates[code]
+                text += f"{flag} <b>{name}:</b> <code>{buy:.2f} / {sell:.2f}</code> грн\n"
+        
+        text += "\n<code>" + "—" * 20 + "</code>\n"
+        text += "🕒 <i>Дані оновлюються автоматично</i>"
         await message.answer(text, parse_mode="HTML")
     else:
         await message.answer("⚠️ <b>Помилка:</b> Не вдалося отримати свіжий курс. Спробуйте пізніше.", parse_mode="HTML")
-    
+        

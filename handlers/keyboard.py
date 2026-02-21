@@ -12,6 +12,7 @@ def main_menu():
     builder.add(types.KeyboardButton(text="Курс валют 💵"))
     builder.add(types.KeyboardButton(text="Цілі 🎯"))
     builder.add(types.KeyboardButton(text="Ліміти 📉"))
+    builder.add(types.KeyboardButton(text="Підписки 🔄"))
     
     builder.adjust(2) # Розташування по 2 кнопки в ряд
     return builder.as_markup(resize_keyboard=True)

@@ -15,6 +15,13 @@ def init_db():
         except sqlite3.OperationalError:
             pass
             
+        cursor.execute("""CREATE TABLE IF NOT EXISTS subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            user_id INTEGER, 
+            name TEXT, 
+            amount REAL, 
+            next_date TEXT, 
+            period TEXT DEFAULT 'monthly')""")
         connection.commit()
 
 def add_expense(user_id, amount, category, date):
@@ -124,4 +131,59 @@ def update_goal_savings(user_id, name, amount):
 def get_goals(user_id):
     with sqlite3.connect("expenses.db") as conn:
         return conn.execute("SELECT name, target_amount, current_amount, deadline FROM goals WHERE user_id = ?", (user_id,)).fetchall()
+
+def add_subscription(user_id, name, amount, next_date):
+    with sqlite3.connect("expenses.db") as conn:
+        conn.execute("INSERT INTO subscriptions (user_id, name, amount, next_date) VALUES (?, ?, ?, ?)", 
+                     (user_id, name, amount, next_date))
+
+def get_subscriptions(user_id):
+    with sqlite3.connect("expenses.db") as conn:
+        return conn.execute("SELECT id, name, amount, next_date FROM subscriptions WHERE user_id = ?", (user_id,)).fetchall()
+
+def delete_subscription(sub_id):
+    with sqlite3.connect("expenses.db") as conn:
+        conn.execute("DELETE FROM subscriptions WHERE id = ?", (sub_id,))
+
+def add_subscription(user_id, name, amount, next_date):
+    with sqlite3.connect("expenses.db") as conn:
+        conn.execute("INSERT INTO subscriptions (user_id, name, amount, next_date) VALUES (?, ?, ?, ?)", 
+                     (user_id, name, amount, next_date))
+
+def get_subscriptions(user_id):
+    with sqlite3.connect("expenses.db") as conn:
+        return conn.execute("SELECT id, name, amount, next_date FROM subscriptions WHERE user_id = ?", (user_id,)).fetchall()
+
+def delete_subscription(sub_id):
+    with sqlite3.connect("expenses.db") as conn:
+        conn.execute("DELETE FROM subscriptions WHERE id = ?", (sub_id,))
+
+def get_subs_by_date(date_str):
+    """Шукає всі підписки, дата оплати яких збігається з поточною"""
+    with sqlite3.connect("expenses.db") as conn:
+        return conn.execute(
+            "SELECT user_id, name, amount FROM subscriptions WHERE next_date = ?", 
+            (date_str,)
+        ).fetchall()
     
+def get_subs_by_date(date_str):
+    """Отримує список підписок, термін яких настав сьогодні."""
+    with sqlite3.connect("expenses.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, user_id, name, amount FROM subscriptions WHERE next_date = ?", 
+            (date_str,)
+        )
+        return cursor.fetchall()
+
+def update_subscription_date(sub_id, current_date_str):
+    """Переносить дату наступного списання на один місяць вперед."""
+    current_date = datetime.strptime(current_date_str, "%Y-%m-%d")
+    # Приблизне додавання 30 днів для наступного місяця
+    next_date = (current_date + timedelta(days=30)).strftime("%Y-%m-%d")
+    
+    with sqlite3.connect("expenses.db") as conn:
+        conn.execute(
+            "UPDATE subscriptions SET next_date = ? WHERE id = ?", 
+            (next_date, sub_id)
+        )
