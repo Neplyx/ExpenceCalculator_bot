@@ -25,8 +25,8 @@
 
 1. Клонуйте репозиторій:
    ```bash
-   git clone [https://github.com/Neplyx/ExpenceCalculator_bot.git](https://github.com/Neplyx/ExpenceCalculator_bot.git)
-   cd ExpenceCalculator_bot
+   git clone [https://github.com/Neplyx/ExpenseCalculator_bot.git](https://github.com/Neplyx/ExpenseCalculator_bot.git)
+   cd ExpencseCalculator_bot
 2. Створіть віртуальне середовище та встановіть залежності:
    ```bash
    python -m venv venv
