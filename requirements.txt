@@ -1,7 +1,12 @@
-aiogram==3.13.0
-google-genai==1.64.0
+aiogram
+google-genai
 apscheduler==3.11.0
 pytz==2025.1
 requests==2.32.3
 matplotlib==3.10.0
 python-dotenv==1.0.1
+pydantic
+sqlalchemy>=2.0.0
+asyncpg>=0.29.0
+alembic>=1.13.0
+pydantic-settings

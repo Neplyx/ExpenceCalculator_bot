@@ -1,12 +1,19 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from handlers.keyboard import main_menu
+# Імпортуємо наш новий репозиторій для роботи з Postgres
+from src.database import requests as rq
+# Імпортуємо клавіатуру з нової структури
+from src.keyboards.main_menu import main_menu_kb
 
 router = Router()
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
+    # ТИХА РЕЄСТРАЦІЯ: додаємо юзера в Postgres
+    await rq.add_user(message.from_user.id, message.from_user.username)
+    
+    # ТЕКСТ ЗАЛИШЕНО БЕЗ ЗМІН
     user_name = message.from_user.first_name
     welcome_text = (
         f"👋 <b>ПРИВІТ, {user_name.upper()}!</b>\n"
@@ -16,10 +23,11 @@ async def cmd_start(message: types.Message):
         f"<code>" + "—" * 20 + "</code>\n"
         "<i>Разом до фінансової свободи!</i> 🚀"
     )
-    await message.answer(welcome_text, reply_markup=main_menu(), parse_mode="HTML")
+    await message.answer(welcome_text, reply_markup=main_menu_kb(), parse_mode="HTML")
 
 @router.message(Command("cancel"))
 @router.message(F.text.casefold() == "скасувати")
 async def cmd_cancel(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("🔙 <b>ДІЮ СКАСОВАНО</b>", reply_markup=main_menu(), parse_mode="HTML")
+    # ТЕКСТ ЗАЛИШЕНО БЕЗ ЗМІН
+    await message.answer("🔙 <b>ДІЮ СКАСОВАНО</b>", reply_markup=main_menu_kb(), parse_mode="HTML")

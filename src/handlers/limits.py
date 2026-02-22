@@ -2,33 +2,38 @@ from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import StateFilter
-from states import LimitStates
-import database as db
-from utils.formatter import get_progress_bar
 from datetime import datetime
-from handlers.keyboard import main_menu 
+
+# Імпорт компонентів з нової структури
+from src.utils.states import LimitStates
+from src.database import requests as rq
+from src.utils.formatter import get_progress_bar
+from src.keyboards.main_menu import main_menu_kb
 
 router = Router()
 
 async def render_limits_menu(event: types.Message | types.CallbackQuery):
+    """Допоміжна функція для відображення меню лімітів (без змін у логіці текстів)"""
     user_id = event.from_user.id
-    limits = db.get_limits(user_id)
-    month_start = datetime.now().strftime("%Y-%m-01")
+    # Отримуємо об'єкти лімітів з Postgres
+    limits = await rq.get_limits(user_id)
     
     builder = InlineKeyboardBuilder()
     builder.button(text="Додати/Змінити ліміт ➕", callback_data="limit_add")
     
+    # ТЕКСТ ТА ОФОРМЛЕННЯ БЕЗ ЗМІН
     text = "📊 <b>МОНІТОРИНГ ЛІМІТІВ</b>\n"
     text += "<code>" + "—" * 20 + "</code>\n\n"
     
     if not limits:
         text += "Ліміти не встановлені. Почніть контролювати витрати вже сьогодні! 📉"
     else:
-        for category, limit_amount in limits:
-            spent = db.get_month_sum_by_category(user_id, category, month_start)
-            progress = get_progress_bar(spent, limit_amount)
-            status = "✅" if spent < limit_amount else "🛑"
-            text += f"{status} <b>{category}</b>\n{progress}\n💰 <code>{spent:.2f} / {limit_amount:.2f} грн</code>\n\n"
+        for lim in limits:
+            # Отримуємо суму витрат за місяць через асинхронний запит
+            spent = await rq.get_monthly_category_sum(user_id, lim.category)
+            progress = get_progress_bar(spent, lim.amount)
+            status = "✅" if spent < lim.amount else "🛑"
+            text += f"{status} <b>{lim.category}</b>\n{progress}\n💰 <code>{spent:.2f} / {lim.amount:.2f} грн</code>\n\n"
         
         text += "<code>" + "—" * 20 + "</code>"
         builder.button(text="Видалити ліміт 🗑", callback_data="limit_delete_menu")
@@ -43,10 +48,11 @@ async def render_limits_menu(event: types.Message | types.CallbackQuery):
 async def show_limits_message(message: types.Message):
     await render_limits_menu(message)
 
-# --- ДОДАВАННЯ ЛІМІТУ (ОНОВЛЕНО: ВСІ 10 КАТЕГОРІЙ) ---
+# --- ДОДАВАННЯ ЛІМІТУ ---
+
 @router.callback_query(F.data == "limit_add", StateFilter("*"))
 async def start_limit_add(callback: types.CallbackQuery, state: FSMContext):
-    # Повний список категорій з KEYWORDS_MAP
+    # Повний список твоїх оригінальних категорій
     categories = [
         "Продукти 🛒", "Транспорт 🚕", "Відпочинок ☕", 
         "Дім/Побут 🏠", "Здоров'я 💊", "Техніка 💻",
@@ -57,8 +63,9 @@ async def start_limit_add(callback: types.CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
     for cat in categories:
         builder.button(text=cat, callback_data=f"setlcat_{cat}")
-    builder.adjust(2) # Кнопки у два стовпчики для зручності
+    builder.adjust(2)
     
+    # ТЕКСТ БЕЗ ЗМІН
     text = (
         "🛠 <b>Крок 1: Оберіть категорію</b>\n\n"
         "Для якої сфери витрат ви хочете встановити ліміт?"
@@ -71,6 +78,7 @@ async def process_limit_cat(callback: types.CallbackQuery, state: FSMContext):
     category = callback.data.split("_")[1]
     await state.update_data(chosen_category=category)
     
+    # ТЕКСТ БЕЗ ЗМІН
     text = (
         f"💳 <b>Крок 2: Встановіть суму</b>\n\n"
         f"Який місячний ліміт ви встановите для категорії <b>'{category}'</b>?"
@@ -88,8 +96,10 @@ async def process_limit_amt(message: types.Message, state: FSMContext):
     data = await state.get_data()
     category = data['chosen_category']
     
-    db.set_limit(message.from_user.id, category, amount)
+    # Зберігаємо/оновлюємо в Postgres
+    await rq.set_limit(message.from_user.id, category, amount)
     
+    # ТЕКСТ БЕЗ ЗМІН
     success_text = (
         f"✅ <b>Ліміт встановлено!</b>\n"
         "<code>" + "—" * 20 + "</code>\n"
@@ -97,24 +107,26 @@ async def process_limit_amt(message: types.Message, state: FSMContext):
         f"💰 <b>Сума:</b> <code>{amount:.2f} грн/міс</code>\n\n"
         "<i>Бот автоматично попередить вас при наближенні до цієї суми.</i>"
     )
-    await message.answer(success_text, reply_markup=main_menu(), parse_mode="HTML")
+    await message.answer(success_text, reply_markup=main_menu_kb(), parse_mode="HTML")
     await state.clear()
 
 # --- ВИДАЛЕННЯ ЛІМІТУ ---
+
 @router.callback_query(F.data == "limit_delete_menu", StateFilter("*"))
 async def show_delete_limits_list(callback: types.CallbackQuery):
-    limits = db.get_limits(callback.from_user.id)
+    limits = await rq.get_limits(callback.from_user.id)
     if not limits:
         await callback.answer("У вас немає лімітів для видалення.")
         return
 
     builder = InlineKeyboardBuilder()
-    for category, amount in limits:
-        builder.button(text=f"Видалити {category} ❌", callback_data=f"limitdel_{category}")
+    for lim in limits:
+        builder.button(text=f"Видалити {lim.category} ❌", callback_data=f"limitdel_{lim.category}")
     
     builder.button(text="Назад 🔙", callback_data="limit_back")
     builder.adjust(1)
     
+    # ТЕКСТ БЕЗ ЗМІН
     text = (
         "🗑 <b>ВИДАЛЕННЯ ЛІМІТУ</b>\n\n"
         "Оберіть категорію, яку хочете прибрати з моніторингу:"
@@ -125,7 +137,8 @@ async def show_delete_limits_list(callback: types.CallbackQuery):
 @router.callback_query(F.data.startswith("limitdel_"), StateFilter("*"))
 async def execute_limit_deletion(callback: types.CallbackQuery):
     category = callback.data.split("_")[1]
-    db.delete_limit(callback.from_user.id, category)
+    # Видаляємо з Postgres
+    await rq.delete_limit(callback.from_user.id, category)
     
     text = f"✅ <b>Успішно:</b> Ліміт для '{category}' видалено."
     await callback.message.edit_text(text, parse_mode="HTML")
