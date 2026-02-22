@@ -68,11 +68,21 @@ async def show_rates(message: types.Message):
         text = "🏦 <b>МОНІТОРИНГ ВАЛЮТ (MONOBANK)</b>\n"
         text += "<code>" + "—" * 20 + "</code>\n\n"
         
-        curr_info = {"USD": ("🇺🇸", "USD"), "EUR": ("🇪🇺", "EUR"), "PLN": ("🇵🇱", "PLN"), "GBP": ("🇬🇧", "GBP")}
+        curr_info = {
+            "USD": ("🇺🇸", "USD"), 
+            "EUR": ("🇪🇺", "EUR"), 
+            "PLN": ("🇵🇱", "PLN"), 
+            "GBP": ("🇬🇧", "GBP")
+        }
+        
         for code, (flag, name) in curr_info.items():
             if code in rates:
-                buy, sell = rates[code]
-                text += f"{flag} <b>{name}:</b> <code>{buy:.2f} / {sell:.2f} грн</code>\n"
+                info = rates[code]
+                # Перевіряємо тип курсу (крос чи звичайний)
+                if info.get("is_cross"):
+                    text += f"{flag} <b>{name}:</b> <code>{info['rate']:.2f} грн</code> (крос-курс)\n"
+                else:
+                    text += f"{flag} <b>{name}:</b> <code>{info['buy']:.2f} / {info['sell']:.2f} грн</code>\n"
         
         text += f"\n<code>" + "—" * 20 + "</code>\n🕒 <i>Дані оновлюються автоматично</i>"
         await message.answer(text, parse_mode="HTML")

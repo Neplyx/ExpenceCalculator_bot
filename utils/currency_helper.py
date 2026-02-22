@@ -14,22 +14,29 @@ def get_currency_rates():
         response = requests.get("https://api.monobank.ua/bank/currency", timeout=10)
         if response.status_code == 200:
             data = response.json()
-            # ISO коди: 840 (USD), 978 (EUR), 985 (PLN), 826 (GBP), 980 (UAH)
+            # ISO коди: 840 (USD), 978 (EUR), 985 (PLN), 826 (GBP)
             codes = {840: "USD", 978: "EUR", 985: "PLN", 826: "GBP"}
             rates = {}
             
             for item in data:
-                # Перевіряємо, чи це потрібна нам валюта відносно гривні
+                # Перевіряємо курс відносно гривні (980)
                 if item["currencyCodeA"] in codes and item["currencyCodeB"] == 980:
                     currency_name = codes[item["currencyCodeA"]]
-                    # Деякі валюти можуть мати прямий курс (rateCross), інші - купівля/продаж
-                    buy = item.get("rateBuy") or item.get("rateCross")
-                    sell = item.get("rateSell") or item.get("rateCross")
                     
-                    if buy and sell:
-                        rates[currency_name] = (float(buy), float(sell))
+                    # Пріоритет 1: Є купівля та продаж (USD, EUR)
+                    if "rateBuy" in item and "rateSell" in item:
+                        rates[currency_name] = {
+                            "buy": float(item["rateBuy"]),
+                            "sell": float(item["rateSell"]),
+                            "is_cross": False
+                        }
+                    # Пріоритет 2: Є тільки крос-курс (PLN, GBP)
+                    elif "rateCross" in item:
+                        rates[currency_name] = {
+                            "rate": float(item["rateCross"]),
+                            "is_cross": True
+                        }
             
-            # Якщо ми знайшли хоча б основні валюти, оновлюємо кеш
             if rates:
                 cached_rates, last_update_time = rates, time.time()
                 return rates
