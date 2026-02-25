@@ -1,6 +1,6 @@
 from sqlalchemy import BigInteger, String, Float, ForeignKey, Date, DateTime, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from datetime import datetime, date
+from datetime import datetime
 
 class Base(DeclarativeBase):
     pass
@@ -18,8 +18,8 @@ class Expense(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.telegram_id", ondelete="CASCADE"))
     amount: Mapped[float] = mapped_column(Float)
     category: Mapped[str] = mapped_column(String(64))
-    # ВИПРАВЛЕНО: прибрано .now().date, додано посилання на функцію today
-    date: Mapped[datetime] = mapped_column(Date, default=datetime.date.today)
+    # ВИПРАВЛЕНО: Використовуємо функцію бази даних для поточної дати
+    date: Mapped[datetime] = mapped_column(Date, server_default=func.current_date())
 
 class Goal(Base):
     __tablename__ = "goals"
